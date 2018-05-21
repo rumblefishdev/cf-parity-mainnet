@@ -1,0 +1,18 @@
+[
+  {
+    "ParameterKey": "VpcId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "InstanceType",
+    "ParameterValue": "t2.medium"
+  },
+  {
+    "ParameterKey": "DNSName",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "DesiredTaskCount",
+    "ParameterValue": "1"
+  }
+]

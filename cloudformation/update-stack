@@ -1,0 +1,7 @@
+PARAMS=${1-stack-parameters.json}
+STACK_NAME=${2-MainnetParity}
+aws cloudformation update-stack \
+  --stack-name $STACK_NAME \
+  --template-body file://`pwd`/service-template.yml \
+  --parameters file://`pwd`/$PARAMS \
+  --capabilities CAPABILITY_NAMED_IAM

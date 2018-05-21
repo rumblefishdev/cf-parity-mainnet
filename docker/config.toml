@@ -1,0 +1,34 @@
+[parity]
+chain = "mainnet"
+auto_update = "none"
+
+[footprint]
+pruning = "fast"
+db_compaction = "ssd"
+cache_size = 512
+
+
+[network]
+port = 30303
+
+[rpc]
+disable = false
+port = 8545
+interface = "all"
+cors = ["*"]
+apis = ["web3", "eth", "personal", "net"]
+hosts = ["all"]
+
+[websockets]
+disable = false
+port = 8546
+interface = "all"
+origins = ["all"]
+apis = ["web3", "eth", "net", "parity", "traces", "rpc", "secretstore"]
+hosts = ["all"]
+
+[ui]
+force = false
+disable = true
+port = 8180
+interface = "0.0.0.0"

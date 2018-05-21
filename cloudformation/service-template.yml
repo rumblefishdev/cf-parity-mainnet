@@ -1,0 +1,410 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ECS cluster running single Parity node (on mainnet)
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  InstanceType:
+    Description: Instance type that will be used in created cluster
+    Type: String
+    Default: t2.medium
+  ChainSnapshotId:
+    Type: String
+    Description: EBS Snapshot from which to initiate the chain data
+    Default: ""
+  DNSName:
+    Type: String
+    Description: DNS name to register too
+  KeyName:
+    Type: String
+    Description: SSH Key name to access the machine
+    Default: ""
+  RepositoryName:
+    Type: String
+    Description: Name of ECR repository to use
+    Default: mainnet-parity
+  DesiredTaskCount:
+    Type: Number
+    Default: 1
+Mappings:
+  AWSRegionToAMI:
+    us-east-2:
+      AMI: ami-1b90a67e
+    us-east-1:
+      AMI: ami-cb17d8b6
+    us-west-2:
+      AMI: ami-05b5277d
+    us-west-1:
+      AMI: ami-9cbbaffc
+    eu-west-3:
+      AMI: ami-914afcec
+    eu-west-2:
+      AMI: ami-a48d6bc3
+    eu-west-1:
+      AMI: ami-bfb5fec6
+    eu-central-1:
+      AMI: ami-ac055447
+Conditions:
+  SSHAccess: !Not [!Equals [ !Ref KeyName, ""]]
+  UseSnapshot: !Not [!Equals [ !Ref ChainSnapshotId, ""]]
+
+Resources:
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref "AWS::StackName"
+  ECSLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub ${AWS::StackName}-logs
+  AccessSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub ${AWS::StackName}-access-parity-sg
+      VpcId: !Ref VpcId
+  ECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub ${AWS::StackName}-sg
+      SecurityGroupIngress:
+        - FromPort: 30303
+          ToPort: 30303
+          CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+        - FromPort: 8545
+          ToPort: 8545
+          SourceSecurityGroupId: !GetAtt AccessSecurityGroup.GroupId
+          IpProtocol: tcp
+        - FromPort: 8546
+          ToPort: 8546
+          SourceSecurityGroupId: !GetAtt AccessSecurityGroup.GroupId
+          IpProtocol: tcp
+        - !If
+          - SSHAccess
+          -
+            FromPort: 22
+            ToPort: 22
+            CidrIp: 0.0.0.0/0
+            IpProtocol: tcp
+          - !Ref "AWS::NoValue"
+
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-sg
+  ECSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      RoleName: !Sub ${AWS::StackName}-ecs-role
+      AssumeRolePolicyDocument: |
+        {
+          "Statement": [{
+            "Action": "sts:AssumeRole",
+            "Effect": "Allow",
+            "Principal": {
+              "Service": "ec2.amazonaws.com"
+            }
+          }]
+        }
+      Policies:
+      - PolicyName: ecs-service
+        PolicyDocument: |
+          {
+            "Statement": [{
+              "Effect": "Allow",
+              "Action": [
+                "ecs:CreateCluster",
+                "ecs:DeregisterContainerInstance",
+                "ecs:DiscoverPollEndpoint",
+                "ecs:Poll",
+                "ecs:RegisterContainerInstance",
+                "ecs:StartTelemetrySession",
+                "ecs:Submit*",
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:BatchGetImage",
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:GetAuthorizationToken",
+                "ec2:DescribeInstanceStatus",
+                "logs:CreateLogStream",
+                "logs:CreateLogGroup",
+                "logs:PutLogEvents",
+                "logs:CreateLogStream",
+                "logs:DescribeLogGroups",
+                "logs:DescribeLogStreams",
+                "logs:PutLogEvents",
+                "route53:*"
+              ],
+              "Resource": "*"
+            }]
+          }
+  ECSInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref ECSRole
+
+  ECSAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AvailabilityZones:
+        Fn::GetAZs:
+          Ref: "AWS::Region"
+      LaunchConfigurationName: !Ref ECSLaunchConfiguration
+      MinSize: 1
+      MaxSize: 2
+      DesiredCapacity: 1
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-ecs-instance
+          PropagateAtLaunch: true
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: 1
+        MaxBatchSize: 1
+        PauseTime: PT15M
+        SuspendProcesses:
+          - HealthCheck
+          - ReplaceUnhealthy
+          - AZRebalance
+          - AlarmNotification
+          - ScheduledActions
+        WaitOnResourceSignals: true
+
+  ECSLaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: !FindInMap [AWSRegionToAMI, !Ref "AWS::Region", AMI]
+      InstanceType: !Ref InstanceType
+      KeyName: !If
+        - SSHAccess
+        - !Ref KeyName
+        - !Ref "AWS::NoValue"
+      SecurityGroups:
+        - !Ref ECSSecurityGroup
+      IamInstanceProfile: !Ref ECSInstanceProfile
+      BlockDeviceMappings:
+      - DeviceName: "/dev/sdh"
+        Ebs:
+          SnapshotId: !If
+            - UseSnapshot
+            - !Ref ChainSnapshotId
+            - !Ref "AWS::NoValue"
+          VolumeSize: '100'
+          VolumeType: gp2
+      UserData:
+        "Fn::Base64": !Sub |
+          #!/bin/bash
+          yum install -y aws-cfn-bootstrap
+          /opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration
+          /opt/aws/bin/cfn-signal -e $? --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSAutoScalingGroup
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            yum:
+              awslogs: []
+          commands:
+            01_add_instance_to_cluster:
+              command: !Sub echo ECS_CLUSTER=${ECSCluster} >> /etc/ecs/ecs.config
+            02_mkdir:
+              command: "mkdir /data"
+              test: "[ ! -d /data ]"
+            03_mkfs:
+              command: !If [ UseSnapshot, "echo 'not running mkfs /dev/sdh'", "mkfs.ext4 /dev/sdh"]
+            04_mount:
+              command: "mount /dev/sdh /data"
+              test: "! mountpoint -q /data"
+            05_register_dns:
+              command: "bash -x /home/ec2-user/register-dns"
+          files:
+            "/etc/cfn/cfn-hup.conf":
+              mode: "000400"
+              owner: root
+              group: root
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+            "/etc/cfn/hooks.d/cfn-auto-reloader.conf":
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.ECSLaunchConfiguration.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration
+            "/etc/awslogs/awscli.conf":
+              content: !Sub |
+                [plugins]
+                cwlogs = cwlogs
+                [default]
+                region = ${AWS::Region}
+            "/etc/awslogs/awslogs.conf":
+              content: !Sub |
+                [general]
+                state_file = /var/lib/awslogs/agent-state
+                [/var/log/dmesg]
+                file = /var/log/dmesg
+                log_group_name = ${ECSLogGroup}
+                log_stream_name = {instance_id}/var/log/dmesg
+                [/var/log/messages]
+                file = /var/log/messages
+                log_group_name = ${ECSLogGroup}
+                log_stream_name = {instance_id}/var/log/messages
+                datetime_format = %b %d %H:%M:%S
+                [/var/log/docker]
+                file = /var/log/docker
+                log_group_name = ${ECSLogGroup}
+                log_stream_name = {instance_id}/var/log/docker
+                datetime_format = %Y-%m-%dT%H:%M:%S.%f
+                [/var/log/ecs/ecs-init.log]
+                file = /var/log/ecs/ecs-init.log.*
+                log_group_name = ${ECSLogGroup}
+                log_stream_name = {instance_id}/var/log/ecs-init
+                datetime_format = %Y-%m-%dT%H:%M:%SZ
+                [/var/log/ecs/ecs-agent.log]
+                file = /var/log/ecs/ecs-agent.log.*
+                log_group_name = ${ECSLogGroup}
+                log_stream_name = {instance_id}/var/log/ecs/ecs-agent
+                datetime_format = %Y-%m-%dT%H:%M:%SZ
+                [/var/log/ecs/audit.log]
+                file = /var/log/ecs/audit.log.*
+                log_group_name = ${ECSLogGroup}
+                log_stream_name = {instance_id}/var/log/ecs/audit
+                datetime_format = %Y-%m-%dT%H:%M:%SZ
+            "/home/ec2-user/change-record-set.json.tmpl":
+              mode: "000400"
+              owner: ec2-user
+              group: ec2-user
+              content: !Sub |
+                {
+                    "Comment": "Update DNS of {DNSName}",
+                    "Changes": [
+                        {
+                            "Action": "UPSERT",
+                            "ResourceRecordSet": {
+                                "Name": "${DNSName}",
+                                "Type": "A",
+                                "TTL": 300,
+                                "ResourceRecords": [
+                                    {
+                                        "Value": "{local_ipv4}"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            "/home/ec2-user/register-dns":
+              mode: "000400"
+              owner: ec2-user
+              group: ec2-user
+              content: !Sub |
+                cd /home/ec2-user
+                LOCAL_IP=`curl http://169.254.169.254/latest/meta-data/local-ipv4`
+                sed -e s/{local_ipv4}/$LOCAL_IP/g change-record-set.json.tmpl > change-record-set.json
+                aws route53 change-resource-record-sets --hosted-zone-id ${HostedZone} --change-batch file:///home/ec2-user/change-record-set.json
+
+          services:
+            sysvinit:
+              cfn-hup:
+                enabled: true
+                ensureRunning: true
+                files:
+                  - /etc/cfn/cfn-hup.conf
+                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+              awslogs:
+                enabled: true
+                ensureRunning: true
+                files:
+                  - /etc/awslogs/awslogs.conf
+                  - /etc/awslogs/awscli.conf
+
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      RoleName: !Sub ${AWS::StackName}-service-role
+      AssumeRolePolicyDocument: |
+        {
+          "Statement": [{
+            "Effect": "Allow",
+            "Principal": {
+              "Service": "ecs-tasks.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
+          }]
+        }
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub parity
+      TaskRoleArn: !Ref TaskRole
+      NetworkMode: bridge
+      ContainerDefinitions:
+        - Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${RepositoryName}:latest
+          Essential: true
+          Memory: 3000
+          MemoryReservation: 1800
+          Name: parity
+          PortMappings:
+            - ContainerPort: 8545
+              HostPort: 8545
+              Protocol: tcp
+            - ContainerPort: 8546
+              HostPort: 8546
+              Protocol: tcp
+            - ContainerPort: 30303
+              HostPort: 30303
+              Protocol: tcp
+          MountPoints:
+            - ContainerPath: /root/.local/share/io.parity.ethereum/chains
+              SourceVolume: parity-chains
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref ECSLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: parity
+      Volumes:
+        - Host:
+            SourcePath: /data/chains
+          Name: parity-chains
+
+  Service:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub ${AWS::StackName}-service
+      Cluster: !Ref ECSCluster
+      DesiredCount: !Ref DesiredTaskCount
+      TaskDefinition: !Ref TaskDefinition
+
+  HostedZone:
+    Type: "AWS::Route53::HostedZone"
+    Properties:
+      Name: !Ref DNSName
+
+Outputs:
+  ECSSecurityGroup:
+    Description: Id of created ECSSecurityGroup
+    Value: !Ref ECSSecurityGroup
+    Export:
+      Name: !Sub ${AWS::StackName}-ECSSecurityGroup
+  ECSCluster:
+    Description: Id of created ECSCluster
+    Value: !Ref ECSCluster
+    Export:
+      Name: !Sub ${AWS::StackName}-ECSCluster
+  NameServer:
+    Description: NS of created hosted zone
+    Value: !Join [ ",", !GetAtt HostedZone.NameServers ]
+    Export:
+      Name: !Sub ${AWS::StackName}-NameServer
+  AccessSecurityGroup:
+    Description: SecurityGroup to access json-rpc
+    Value: !Ref AccessSecurityGroup
+    Export:
+      Name: !Sub ${AWS::StackName}-AccessSecurityGroup
