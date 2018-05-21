@@ -1,9 +1,11 @@
-Quick start
------------
+TL;DR summary
+-------------
 
-TL,DR; just get my node up.
+This is TL;DR summary to just get the node up. It assumes that you have an AWS account set up
+with programmatic access.
 
-1. Open console.
+1. Open terminal. Install ``aws`` and ``jq`` if not installed.
+
 
 2. Setup which account and region you work with.
 
@@ -17,10 +19,13 @@ TL,DR; just get my node up.
 
    ::
 
-      bash # matching entry in ~/.aws/credentials
+      bash build_and_upload.sh
+
+   This command creates an ECR repository under your account and pushes there a slightly
+   customized image of Parity client.
 
 
-4. Create specify parameters of your stack.
+4. Specify parameters of the node.
 
    ::
 
@@ -28,11 +33,11 @@ TL,DR; just get my node up.
       cp cp stack-parameters.default.json stack-parameters.json
       $EDITOR stack-parameters.json
 
-   In here you need to specify the `VpcId` to run the chain in and DNSName to register for
-   your node (eg. `mainnet.rumblefishdev.com`)
+   In here you need to specify the ``VpcId`` to run the chain in and DNSName to register for
+   your node (eg. ``mainnet.rumblefishdev.com``)
 
 
-5. Launch stack creation.
+5. Create CloudFormation stack.
 
    ::
 
