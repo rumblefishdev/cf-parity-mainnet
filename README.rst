@@ -30,11 +30,12 @@ with programmatic access.
    ::
 
       cd cloudformation
-      cp cp stack-parameters.default.json stack-parameters.json
+      cp stack-parameters.default.json stack-parameters.json
       $EDITOR stack-parameters.json
 
-   In here you need to specify the ``VpcId`` to run the chain in and DNSName to register for
-   your node (eg. ``mainnet.rumblefishdev.com``)
+   In here you need to specify:
+     - ``VpcId`` to run the chain
+     - ``DNSName`` to register for your node (eg. ``mainnet.rumblefishdev.com``)
 
 
 5. Create CloudFormation stack.
