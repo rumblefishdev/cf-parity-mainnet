@@ -1,3 +1,17 @@
+Overview
+--------
+
+AWS recently published CloudFormation templates [1]_ to launch a private Ethereum testing network.
+Their solution comes with an app for viewing blocks, a miner, etc. As great as it this solution isn't easy to apply to run a mainnet node.
+
+First, lets try to answer why would anyone need a privately hosted mainnet Ethereum node instead of relying on Infura. In Rumble Fish we have few projects where some backend component is interacting
+with the Ethereum blockchain. In some cases it reacts on Event notification, in other it's responsible
+for closing financial transaction and it needs to act fast.
+
+It's never a good idea to make a business-critical process rely on external service operating well.
+Whatever happens with Infura is beyond our control. If it goes down there could only wait. This may
+not be a problem for many applications, in our case we had to eliminate this risk.
+
 TL;DR summary
 -------------
 
@@ -65,21 +79,6 @@ with programmatic access.
    ::
 
       bash -x update-stack
-
-
-Overview
---------
-
-AWS recently published CloudFormation templates [1]_ to launch a private Ethereum testing network.
-Their solution comes with an app for viewing blocks, a miner, etc. As great as it this solution isn't easy to apply to run a mainnet node.
-
-First, lets try to answer why would anyone need a privately hosted mainnet Ethereum node instead of relying on Infura. In Rumble Fish we have few projects where some backend component is interacting
-with the Ethereum blockchain. In some cases it reacts on Event notification, in other it's responsible
-for closing financial transaction and it needs to act fast.
-
-It's never a good idea to make a business-critical process rely on external service operating well.
-Whatever happens with Infura is beyond our control. If it goes down there could only wait. This may
-not be a problem for many applications, in our case we had to eliminate this risk.
 
 
 Challenges of running mainnet node
