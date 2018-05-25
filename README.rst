@@ -1,5 +1,3 @@
-Overview
---------
 
 AWS recently published CloudFormation templates [1]_ to launch a private Ethereum testing network.
 Their solution comes with an app for viewing blocks, a miner, etc. As great as it this solution isn't easy to apply to run a mainnet node.
