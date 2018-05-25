@@ -377,7 +377,7 @@ downsized disk and machine type.
 Staying in sync
 &&&&&&&&&&&&&&&
 
-Once the node is fully synced and synchronized it generally stays in sync with head of the chain.
+Once the node is fully synced and synchronized it generally stays in sync with head of the chain :-)
 
 .. image:: docs/images/parity-diff-to-infura.png
     :width: 80%
