@@ -46,5 +46,6 @@ fi
 
 BUILD_PATH=./docker
 `aws ecr get-login --no-include-email`
-build $REPO_URL:latest $BUILD_PATH
+TAG="$REPO_URL:latest"
+build $TAG $BUILD_PATH
 upload $TAG
