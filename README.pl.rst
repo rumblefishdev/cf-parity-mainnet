@@ -1,31 +1,37 @@
 
-Ostatnio AWS opublikowało szablony [1]_ CloudFormation, aby uruchomić prywatną sieć testową Ethereum.
-Ich rozwiązanie zawiera aplikację do przeglądania bloków, majnera itp. Tak wielkie, jak to jest, to rozwiązanie nie jest łatwe do zastosowania do uruchomienia node'a na mainnecie.
+Ostatnio AWS opublikował szablony [1]_ CloudFormation pozwalające uruchomić prywatną sieć testową
+Ethereum.
+Ich rozwiązanie zawiera aplikację do przeglądania bloków, minera, itp. Podejście AWS jest dobre dla
+uruchomienia prywatnej sieci testowej, natomiast jest trudne do przystosowania, żeby działać w sieci
+mainnet.
 
-Po pierwsze, spróbujmy odpowiedzieć, dlaczego ktokolwiek potrzebuje prywatnie hostowanego node'a na mainnet Ethereum zamiast polegać na Infurze. W Rumble Fish mamy kilka projektów, w których jakiś komponent backendowy wchodzi w interakcje
-z Ethereum blockchain. W niektórych przypadkach on reaguje na powiadomienia o eventach, w innych jest odpowiedzialny
-za zamknięcie transakcji finansowej i musi działać szybko.
+Po pierwsze, spróbujmy odpowiedzieć, dlaczego ktoś może potrzebować prywatnie hostowanego node'a Ethereum
+na mainnet zamiast polegać na Infurze. W Rumble Fish mamy kilka projektów, w których jakiś komponent
+backendowy wchodzi w interakcje z Ethereum blockchain. W niektórych przypadkach reaguje on na powiadomienia
+o eventach, w innych jest odpowiedzialny za zamknięcie transakcji finansowej i musi działać błyskawicznie.
 
-Nigdy nie jest dobrym pomysłem, aby proces o kluczowym znaczeniu dla firmy polegał na dobrej obsłudze zewnętrznej.
-Gdy cokolwiek stanie się z Infurą, będzie to poza naszą kontrolą. Jeśli padnie, możemy tylko czekać. To może nie stanowić problemu dla wielu aplikacji, ale w naszym przypadku musimy wyeliminować takie ryzyko.
+Nigdy nie jest dobrym pomysłem, aby proces o kluczowym znaczeniu dla firmy polegał usłudze zewnętrznej.
+Jeśli cokolwiek stałoby się z Infurą, usunięcie problemu będzie poza naszym zasięgiem. Jeśli padnie,
+możemy tylko czekać aż zawnętrzny team usunie awaria. Dla wielu aplikacji to może nie stanowić problemu,
+ale w naszym przypadku musieliśmy wyeliminować takie ryzyko.
 
 TL;DR podsumowanie
--------------
+------------------
 
-Aby postawić node'a, wykonaj poniższy punkt. Załóżmy, że masz skonfigurowane konto AWS
-z programistycznym dostępem.
+Aby postawić node'a, wykonaj poniższy punkty. Zakładamy, że masz już skonfigurowane konto AWS z
+dostępem programistycznym.
 
 
-0. Sklonuj ten repozytorium.
+0. Sklonuj to repozytorium.
 
    ::
 
      git clone https://github.com/rumblefishdev/cf-parity-mainnet.git
 
-1. Otwórz terminal. Zainstaluj ``aws`` and ``jq`` jeśli nie jest zainstalowane.
+1. Otwórz terminal. Zainstaluj ``aws`` and ``jq`` jeśli nie są zainstalowane.
 
 
-2. Ustal, z którym kontem i regionem współpracujesz.
+2. Ustaw, z którego konta i regionu używasz.
 
    ::
 
@@ -39,7 +45,8 @@ z programistycznym dostępem.
 
       bash build_and_upload.sh
 
-Ta komenda tworzy repozytorium ECR na twoim koncie i przepycha lekko spersonalizowany obraz klienta Parity.   
+Ta komenda tworzy repozytorium ECR na twoim koncie i wypycha lekko spersonalizowany
+obraz klienta Parity.
 
 
 4. Określ parametry node'a.
@@ -56,18 +63,16 @@ Ta komenda tworzy repozytorium ECR na twoim koncie i przepycha lekko spersonaliz
     - ``DNSName`` to register for your node (eg. ``mainnet.rumblefishdev.com``)
 
 
-5. Utwórz CloudFormation stack.
+5. Utwórz stack CloudFormation.
 
    ::
 
       bash -x create-stack
 
 
-6. Idź do konsoli CloudFormation i zaczekaj aż się skończy tworzenie stacku.
+6. Idź do konsoli CloudFormation i zaczekaj aż skończy się tworzenie stacku.
 
-
-Uzyskaj wyeksportowane dane wyjściowe ``NameServer`` i umieść je jako wpis NS w konfiguracji DNS twojej domeny.
- 
+   Uzyskaj wyeksportowane dane wyjściowe ``NameServer`` i umieść je jako wpis NS w konfiguracji DNS twojej domeny.
 
 7. Zaczekaj około 3 dni na zakończenie synchronizacji i weryfikacji.
 
@@ -81,59 +86,71 @@ Uzyskaj wyeksportowane dane wyjściowe ``NameServer`` i umieść je jako wpis NS
       bash -x update-stack
 
 
-Wyzwania związane z uruchamianiem mainnet node'a
-----------------------------------
+Wyzwania związane z uruchamianiem node'a na mainnecie
+-----------------------------------------------------
 
-Trwałość danych Blockchain 
-&&&&&&&&&&&&&&&&&&&&&&&&&&&
+Trwałość danych Blockchain
+&&&&&&&&&&&&&&&&&&&&&&&&&&
 
-Największym wyzwaniem związanym z uzyskaniem wmainnet node'a jest jego synchronizacja.
+Największym wyzwaniem związanym z uruchomienie mainnetowego node'a jest jego synchronizacja.
 Synchronizacja nowo podłączonego node'a od zera zajmuje 2-3 godziny, aby dostać się do bieżących bloków.
-Jeszcze 2-3 dni potrzebne, aby zakończyć proces weryfikacji kryptograficznej wszystkich bloków.
-Proces weryfikacji korzysta ze wszystkich dostępnych IOPS, co sprawia, że ​​node jest mało responsywny.
-W tym czasie node może ulec opóźnieniu nawet o 30 bloków przez co robi się mało przydatny. Dopiero po zakończeniu procesu weryfikacji node robi się stabilny i możemy na nim polegać. Stack'i oferowane przez AWS nie rozwiązują tego problemu - każdy node
-zaczyna się od nowa. To jest ok, o ile nie masz dużej ilości danych do zsynchronizowania
-z innych node'ów.
+Następnie potrzebne jest jeszcze 2-3 dni, aby zakończyć proces weryfikacji kryptograficznej wszystkich bloków.
+Proces weryfikacji korzysta ze wszystkich dostępnych IOPSów, co sprawia, że ​​node jest mało responsywny.
+W tym czasie node może ulec opóźnieniu nawet o 30 bloków przez co robi się mało przydatny. Dopiero po zakończeniu
+procesu weryfikacji node robi się stabilny i można na nim polegać. Stacki oferowane przez AWS nie rozwiązują
+tego problemu - każdy node zaczyna synchronizacje od zera. To jest ok, o ile nie masz dużej ilości
+danych do zsynchronizowania z innych node'ów, więc nie nadaje się dla mainnetu.
 
-Ponieważ uzyskanie nowego nod'a "kosztuje" 3 dni, konieczne jest utrzymanie danych między uruchomieniami node'a. Oczywiście istnieje więcej niż jeden sposób, aby to osiągnąć. Rozwiązanie, które proponujemy to przechowywać dane bloków na dysku EBS i zrobić jego snapshot kiedy blockchain zostanie w pełni zsynchronizowany. Jeśli node zostanie zakończony, a nowy przejmie jego funkcje, wystarczy zsynchronizować bloki od momentu snapshota, a nie całe 3 lata historii blockchainu.
+Ponieważ uzyskanie nowego node'a "kosztuje" 3 dni, konieczne jest utrzymanie ściągniętych danych między
+uruchomieniami node'a. Istnieje więcej niż jeden sposób, aby to osiągnąć. Rozwiązanie, które proponujemy
+to umieszczenie danych blockchainu na EBS i wykonanie snapshotu kiedy blockchain zostanie w pełni zsynchronizowany.
+Jeśli node zostanie zrestartowany, a nowy przejmie jego funkcje, musi on dociągnąć bloki od momentu snapshotu,
+a nie całe 3 lata historii blockchainu.
 
-Oczywiście to nie jest idealne i wolelibyśmy mieć trwałe dane bez konieczności ponownego zsynchronizowania wszystkich bloków, więc do tej pory nie znaleźliśmy idealnego rozwiązania.
+Oczywiście to nie jest idealne rozwiązanie i wolelibyśmy mieć trwałe dane bez konieczności ponownego
+zsynchronizowania wszystkich bloków.
 
 
 Podejścia, które zlekceważyliśmy
-###############################
+################################
 
 Pojedyńczy trwały EBS
 +++++++++++++++++++++
 
-Jedną z rzeczy, którą próbowaliśmy, było utworzenie trwałego EBS volume poza kontekstem maszyny EC2 i podłączenie go do node'a podczas uruchamiania. Takie podejście ma swoje zalety. Kiedy maszyna się wyłącza, to nowa się odpala w miejscu gdzie poprzednia maszyna się skończyła. To jest świetna funkcja, ponieważ minimizuje opóźnienie ponownej synchronizacji.
+Jedną z rzeczy, którą próbowaliśmy, było utworzenie trwałego EBS volume poza kontekstem maszyny EC2 i podłączenie
+go do node'a podczas uruchamiania. Takie podejście ma swoje zalety. Kiedy tworzy się nowa maszyna, podejmuje synchronizacje
+w miejscu gdzie poprzednia maszyna przerwała. To podejśmie minimizuje czas regeneracji maszyny.
 
 Z drugiej strony takie podejście nie działa dobrze z rosnącą liczbą instancji w górę i w dół.
-W scenariuszu, w którym chcielibyśmy mieć więcej node'ów do przełączenia awaryjnego lub zrównoważenia obciążenia, trzeba dodać dodatkową warstwę, aby zdecydować, który dysk EBS mamy użyć lub w miare możliwości stworzyć nowy.
+W scenariuszu, w którym chcielibyśmy mieć więcej node'ów do przełączenia awaryjnego lub zrównoważenia obciążenia,
+trzeba dodać dodatkową warstwę, aby zdecydować, który dysk EBS mamy użyć lub w miare możliwości stworzyć nowy.
 Odrzuciliśmy to podejście jako zbyt skomplikowane.
 
 
 Elastic File System (EFS)
 +++++++++++++++++++++++++
 
-Kolejną interesującą próbą rozwiązania rosnącego problemu było użycie EFS. W przeciwieństwie do EBS ten system może być
-połączony z wieloma instancjami, które dzielą go za pomocą protokołu podobnego do NFS. Niestety widzieliśmy
+Kolejną interesującą próbą rozwiązania problemu było użycie EFS. W przeciwieństwie do EBS ten system może być
+połączony z wieloma instancjami, które współdzielą go za pomocą protokołu podobnego do NFS. Niestety widzieliśmy
 że node'y z blockchainowymi danymi na EFS bardzo długo się synchronizują. Parity używa dużo
-IOPS i EFS oferuje znacznie niższą wydajność niż EBS.
+IOPS i wydajność oferowana przez EFS jest daleko niewystarczająca.
 
 
 
 Dostęp do publicznej sieci dla warstwy synchronizacji
-&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 
-Aby się zsynchronizować, node musi być w stanie akceptować połączenia z innych node'ów.
-Mówiąc wprost, wymagane jest aby jedna strona połączenia mogła akceptować
-połączenia, więc technicznie moglibyśmy obyć się bez dostępu do publicznej sieci. Jednak jakbyśmy pomineli publiczny dostęp,
-nasz node mógł by pracować tylko z node'ami oferującymi dostęp publiczny, co eliminuje duży fragment poola partnerów.
+Aby się zsynchronizować, node musi być w stanie akceptować połączenia od innych node'ów.
+Wymagane jest aby jedna strona połączenia mogła akceptować połączenia, więc teoretycznie
+moglibyśmy obyć się bez dostępu do publicznej sieci i polegać na możliwości połaczenia
+do partnerów.
+
+W takim scenariuszu nasz node mógłby pracować tylko z node'ami oferującymi dostęp publiczny,
+co eliminuje znaczną część populacji partnerów.
 
 Aby zapewnić publiczny dostęp, skorzystaliśmy z następujących kroków.
 
-1. Parity jest uruchamione w kontenerze dokowania. Port 30303 jest połączony przez taki cloudformation stack.
+1. Parity jest uruchamione w kontenerze dockera. Port 30303 jest otwarte przez następujący przepis:
 
    ::
 
@@ -150,8 +167,8 @@ Aby zapewnić publiczny dostęp, skorzystaliśmy z następujących kroków.
                  Protocol: tcp
 
 
-2. Node powinien znać swój publiczny adres IP, ponieważ jest używany jako identyfikator enode emitowany do
-   innych node'ów. To rozwiązanie jest wyłącznie dla EC2 i opiera się na wewnętrznym API dostępnym z komputera. 
+2. Ponadto node musi znać swój publiczny adres IP, ponieważ jest używany jako identyfikator enode używany przez
+   inne node'y do identyfikacji. Poniższe rozwiązanie polega na API wystawionym przez EC2, więc jest specyficzne dla AWS.
 
    From ``docker/run_parity.sh``:
 
@@ -161,7 +178,7 @@ Aby zapewnić publiczny dostęp, skorzystaliśmy z następujących kroków.
       /parity/parity --config config.toml --nat extip:$PUBLIC_IP
 
 3. Aby port maszyny EC2 był dostępny, należy go również otworzyć w konfiguracji grupy zabezpieczeń.
-   Ta część stacku jest odpowiedzialna właśnie za to. 
+   Jest za to odpowiedzialna poniższa część stacku.
 
 
    ::
@@ -180,30 +197,32 @@ Aby zapewnić publiczny dostęp, skorzystaliśmy z następujących kroków.
 
 
 Prywatny dostęp do json-rpc i interfejsów websocket
-&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 
 Parity ma jeszcze dwa interfejsy sieciowe do uzyskiwania dostępu do danych blockchain.
-  - port 8545 jest używany dla json-rpc api: umieszczenie transakcji i uzyskiwanie wszelkiego rodzaju informacji
-  - port 8546 może być używany do otrzymywania powiadomień z node'a o nowych blokach i / lub eventach
+  - port 8545 jest używany przez interfejs json-rpc: umieszczenie transakcji i uzyskiwanie wszelkiego rodzaju informacji
+  - port 8546 umożliwia to samo ale poprzez protokół websocket
 
 
-Najpierw omówmy, dlaczego uważamy, że json-rpc nie powinien być publicznie dostępny. W zależności od konkretnego
-przypadku otworzenie json-rpc może nie sprawiać problemu. Jednak w Rumble Fish wierzymy że cokolwiek
+Najpierw omówmy, dlaczego uważamy, że json-rpc nie powinien być dostęþny publicznie. W zależności od konkretnego
+przypadku otworzenie json-rpc może nie sprawiać problemu. Jednak w Rumble Fish wierzymy, że cokolwiek
 co może być ukryte powinno pozostać ukryte.
 
-Pozostawienie otwartego interfejsu json-rpc nie stanowi zagrożenia dla pieniędzy. Przynajmniej póki nie ma podstawowego błędu w Parity, który nie został zidentyfikowany. Niemniej jednak łatwo sobie wyobrazić, że osoba atakująca może po prostu uruchomić wiele zapytań na node'zie, aby zapobiec jego prawidłowemu użyciu. Więc warto się postarać i zrobić tą część bezpieczniejszą.
+Pozostawienie otwartego interfejsu json-rpc nie stanowi zagrożenia dla środków na koncie. Niemniej jednak łatwo
+sobie wyobrazić, że osoba atakująca może po prostu uruchomić wiele zapytań na node'zie,
+aby go przeciążyć. Warto więc się postarać i zabezpieczyć tą część infrastruktury.
 
 Nasze podejście do prywatnego dostępu składa się z następujących elementów.
 
-1. Cloudformation stack tworzy i eksportuje specjalną grupę SecurityGroup używaną do uzyskiwania dostępu do node'a.
-   Możesz zaimportować inny stack używając: 
+1. Cloudformation stack tworzy i eksportuje specjalną SecurityGroup używaną do uzyskiwania dostępu do node'a.
+   Można ją zaimportować w innym stacku używając:
 
    ::
 
      !Fn::Import MainnetParity-AccessSecurityGroup
 
 2. Ta grupa ma dostęp do instancji używając następującego ustawienia w grupie SecurityGroup
-   Instancji EC2. 
+   Instancji EC2.
 
    ::
 
@@ -224,9 +243,9 @@ Nasze podejście do prywatnego dostępu składa się z następujących elementó
 
 
 
-Te porty te są kierowane do docker kontenera, podobnie do tego co wcześniej robiliśmy z portem 30303.    
+   Te porty są kierowane do docker kontenera, analogicznie do tego co wcześniej robiliśmy z portem 30303.
 
-    ::
+   ::
 
       Resources:
         TaskDefinition:
@@ -244,24 +263,20 @@ Te porty te są kierowane do docker kontenera, podobnie do tego co wcześniej ro
                   Protocol: tcp
 
 3. Klient łączący się z json-rpc / websocketem musi używać prywatnego adresu IP instancji.
-   Osiągamy to, tworząc Route53 HostedZone i rejestrując IP instancji tam przy odpalaniu. 
+   Osiągamy to, tworząc Route53 HostedZone i rejestrując IP instancji przy uruchomieniu maszyny.
 
-Cloudformation stack eksportuje serwery DNS tej strefy jako
+   Cloudformation stack eksportuje serwery DNS tej strefy jako
 
-   ::
+     ::
 
-     !Fn::Import MainnetParity-NameServer
-
-
-
- lub wyszukiwanie w eksporcie konsoli AWS.
-  
-
-Powinieneś umieścić tą wartość jako wpis NS w konfiguracji swojej domeny DNS.
+       !Fn::Import MainnetParity-NameServer
 
 
-Monitotrowanie i logowanie 
-----------------------
+   Powinieneś umieścić tą wartość jako wpis NS w konfiguracji swojej domeny DNS.
+
+
+Monitotrowanie i logowanie
+--------------------------
 
 Stack jest skonfigurowany do zbierania interesujących plików z maszyny i przesyłania ich do CloudWatch
 log stream'u ``MainnetParity-logs``.
@@ -274,13 +289,13 @@ log stream'u ``MainnetParity-logs``.
 
 
 Proces synchronizacji i weryfikacji
-&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 
-Tutaj interesującymi bitami są nazwy plików ``/parity/parity/...`` które są wynikami procesu Parity. 
-Przy pierwszym uruchomieniu stack użyje synchronizacji warp, aby pobrać historię blockchainu
+Tutaj interesują nas nazwy plików ``/parity/parity/...`` które są wyjściem z procesu Parity.
+Przy pierwszym uruchomieniu stack użyje warp sync, aby pobrać historię blockchainu
 przy użyciu protokołu pobierania zbiorczego Parity.
 
-Na wyjściu to wygląda tak:
+Na wyjściu wygląda to tak:
 
 ::
 
@@ -305,9 +320,8 @@ Na wyjściu to wygląda tak:
   2018-05-11T09:28:36.809Z 2018-05-11 09:28:36 UTC Syncing snapshot 29/1370        #0    3/25 peers      8 KiB chain    3 MiB db  0 bytes queue   10 KiB sync  RPC:  0 conn,  0 req/s,   0 µs
 
 
-
-Proces synchronizacji snapshotów zajmuje około 3 godzin. Po zsynchronizowaniu snapshotów Parity pobierze wszystkie bloki utworzone od ostatniego snapshotu, aż do obecnie najnowszego bloku.
-Ta faza wygląda tak:
+Proces synchronizacji snapshotów zajmuje około 3 godziny. Po zsynchronizowaniu snapshotów Parity pobierze wszystkie bloki utworzone od ostatniego snapshotu, aż do obecnie najnowszego bloku.
+Ta faza wygląda w logach tak:
 
 ::
 
@@ -318,7 +332,7 @@ Ta faza wygląda tak:
 
 Wykonanie tego etapu zajmie jeszcze około godzinę.
 
-Po zakończeniu tej fazy log zmieni się w następujący sposób:
+Po zakończeniu tej fazy log zmieni się i będzie wyglądał następująco:
 
 ::
 
@@ -335,10 +349,12 @@ Po zakończeniu tej fazy log zmieni się w następujący sposób:
   2018-05-11T15:26:02.263Z 2018-05-11 15:26:02 UTC     #78637   23/25 peers     37 MiB chain  183 MiB db  241 KiB queue   22 MiB sync  RPC:  0 conn,  0 req/s,   0 µs
   2018-05-11T15:26:03.398Z 2018-05-11 15:26:03 UTC Reorg to #5595628 8fc3…7c58 (a4a9…9dc0 18c7…4d47 #5595625 f6c1…feae 3faf…012d af04…83a8)
 
-Nowy typ linii logowania rozpoczynający się od numeru bloku (``#40653 ..``) pochodzi z procesu weryfikacji pobranych bloków. W tym procesie Parity weryfikuje każdy blok kryptograficzny i zapewnia, że ​​nikt nie manipuluje danymi.
+Nowy typ linii logowania rozpoczynający się od numeru bloku (``#40653 ..``) pochodzi z procesu weryfikacji pobranych bloków. W tym procesie Parity weryfikuje każdy
+blok kryptograficznie i zapewnia, że ​​nikt nie zmanipulował danych, które pobraliśmy od innych node'ów.
 
-Ten proces trwa około 3 dni, gdy jest uruchamiany na``t2.machine`` with gp2 EBS ``300 IOPS``. 
-Podczas jego działania można obserwować w monitorowaniu EBS że wszystkie dostępne IOPS są zużywane. Zrzut ekranu poniżej przedstawia moment zakończenia procesu weryfikacji. Możesz zobaczyć różnicę we wzorcu użycia.
+Ten proces trwa około 3 dni, gdy jest uruchamiany na maszynie ``t2.medium`` z dyskkiej EBS gp2 z ``300 IOPS``.
+Podczas jego działania można obserwować w monitorowaniu EBS, że wszystkie dostępne IOPSy są używane.
+Zrzut ekranu poniżej przedstawia moment zakończenia procesu weryfikacji. Możesz zobaczyć różnicę we wzorcu użycia.
 
 .. figure:: docs/images/read-iops-end-of-sync.png
     :width: 80%
@@ -351,21 +367,22 @@ Podczas jego działania można obserwować w monitorowaniu EBS że wszystkie dos
     Write IOPS
 
 
-Ponieważ proces weryfikacji jest ograniczony IO, można go przyspieszyć, wyposażając dysk EBS w dodatkowe IOPS.
-W naszym CloudFormation stack
-używamy ``gp2`` VolumeType with the size of ``100 GB``. AWS zapewnia 300 podstawowych IOPS dla takiego dysku. 
-Jeśli chcesz przyspieszyć weryfikację, możesz zmodyfikować VolumeType na ``io1`` and give it ``1200`` IOPS. 
-Na tym poziomie obserwujemy, że proces weryfikacji nie jest już ograniczony przez dostępne IOPS, ale brakuje mu mocy CPU.
-Dlatego możesz przepchnąc go na inny poziom, zmieniając rozmiar maszyny EC2 z ``t2.medium`` to ``c5.large``.
-Działając na ``c5.large`` zauważyliśmy, że podczas weryfikacji Parity używa 2000 IOPS i może zakończyć cały proces w około 7 godzin, więc jest to dobry skrót, jeśli chcesz szybko uzyskać wyniki. 
-Pamiętaj, że skonfigurowane IOPS nie są tanie - miesięczny koszt pozostawienia dysku o tym rozmiarze oraz IOPS, będzie w zasięgu 100 USD, więc bądź ostrożny.
+Ponieważ proces weryfikacji jest ograniczony przez dostępne IOPSy, można go przyspieszyć dostarczając dodatkowe IOPSy.
+W naszym CloudFormation stack używamy ``gp2`` VolumeType o rozmiarze ``100 GB``. AWS zapewnia 300 IOPSów dla takiego dysku.
+Jeśli chcesz przyspieszyć weryfikację, możesz zmodyfikować VolumeType na ``io1`` i prowizjonować mu np ``1200`` IOPS.
+Na tym poziomie obserwujemy w zakładce monitoringu, że proces weryfikacji nie jest już ograniczony przez dostępne IOPS, ale brakuje mu mocy CPU.
+Dlatego można go dalej przyspieszyć, zmieniając typ maszyny EC2 z ``t2.medium`` na ``c5.large``.
+Działając na ``c5.large`` zauważyliśmy, że podczas weryfikacji Parity używa 2000 IOPS i może zakończyć cały proces w około 7 godzin,
+więc to jest dobry trick, jeśli bardziej niż na pieniądzasz zależy nam na czasie.
+Pamiętaj jednak, że dodatkowo prowizjonowane IOPSy nie są tanie - miesięczny koszt pozostawienia dysku o tym rozmiarze oraz IOPS,
+będzie w okolicach 100 USD, więc lepiej uważać.
 
-Pomysł jest taki, że po zakończeniu synchronizacji i weryfikacji można zrobić snapshota i użyć go do ponownego uruchomienia klastra za pomocą
-zmniejszonego dysku i typu maszyny.
+Pomysł jest taki, żeby po zakończeniu synchronizacji i weryfikacji zrobić snapshota i użyć go do ponownego uruchomienia klastra
+ze zmniejszonym dyskiem i typem maszyny.
 
 
-Pozostańie zsynchronizowanym
-&&&&&&&&&&&&&&&
+Utrzymanie synchronizacji
+&&&&&&&&&&&&&&&&&&&&&&&&&
 
 Gdy node jest w pełni zsynchronizowany, zwykle pozostaje zsynchronizowany z najnowszym blockiem :-)
 
@@ -374,9 +391,10 @@ Gdy node jest w pełni zsynchronizowany, zwykle pozostaje zsynchronizowany z naj
 
 
 Powyższy obrazek przedstawia efekt wywołania ``eth_blockNumber`` na naszym node'ie i na Infurze.
-Przez większość czasu node'y są zsynchronizowane. Sporadycznie nasz node lub Infura spada o 1-4 bloki do tylu.
+Przez większość czasu node'y są zsynchronizowane. Sporadycznie nasz node lub Infura spada o 1-4 bloki do tyłu.
 
-Pamiętaj, że obecnie ten repozytorium nie zawiera Lambdy odpowiedzialnej za gromadzenie
-powyższych danych. Zostanie to uwzględnione w przyszłych artykułach.
+Pamiętaj, że obecnie to repozytorium nie zawiera Lambdy odpowiedzialnej za gromadzenie
+powyższych danych. Ta część infrastruktury znajduje się w narzędziu wyższego rzędu [2]_.
 
 .. [1] https://docs.aws.amazon.com/blockchain-templates/latest/developerguide/blockchain-templates-ethereum.html
+.. [2] https://www.rumblefishdev.com/blog/How-to-build-your-own-Infura-on-AWS-using-serverless-framework
